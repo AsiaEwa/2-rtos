@@ -1,0 +1,137 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
+#include <pthread.h>
+#include <sys/resource.h>
+#include <string.h>
+#include "math.h"
+#include "fft.h"
+
+#define FFT_SER 20000
+#define NumTh   2
+
+TYP_FFT Rin[FFT_LEN]={0};
+TYP_FFT Rout[FFT_LEN]={0};
+TYP_FFT Iin[FFT_LEN]={0};
+TYP_FFT Iout[FFT_LEN]={0};
+
+TYP_FFT Rin2[FFT_LEN]={0};
+TYP_FFT Rout2[FFT_LEN]={0};
+TYP_FFT Iin2[FFT_LEN]={0};
+TYP_FFT Iout2[FFT_LEN]={0};
+
+// define barrier synchronization object, it must be global shared variable
+/*________________________________________*/
+pthread_barrier_t barrier; // define barrier synchronization object
+pthread_t  thID[NumTh];
+int ST_Processing1 = 0;
+int ST_Processing2 = 0;
+
+void *thread1 (void *not_used){
+    time_t  now;
+    int F_p=0, i=0, s=0;
+    double MAX_A=0.0, A_Mod;
+
+    time (&now);
+    printf ("thread1 starting at %s", ctime (&now));
+
+	// do the computation
+	for(s=0; s<FFT_SER; s++){
+		memset((void*) &Rout, 0, FFT_LEN*sizeof(double));
+		memset((void*) &Iout, 0, FFT_LEN*sizeof(double));
+		fft(FFT_LEN, 0, Rin, Iin, Rout, Iout);
+		for(i=0; i<FFT_LEN/2; i++){
+			A_Mod=ImModul(Rout[i],Iout[i]);
+			if(A_Mod > MAX_A){
+				MAX_A = A_Mod;
+				F_p = i;
+			}
+		}
+	}
+	printf("Maximum value = %f at frequency %d.\n", MAX_A, F_p);
+	// set the barrier at this point...
+    /*________________________________________*/
+	pthread_barrier_wait(&barrier);
+
+	// after this point, thread has completed.
+	time (&now);
+	printf ("barrier in thread1() done at %s", ctime (&now));
+
+    pthread_exit( NULL );
+}
+
+void *thread2 (void *not_used){
+    int F_p=0, i=0, s=0;
+    double MAX_A=0.0, A_Mod;
+
+    time_t  now;
+
+    time (&now);
+    printf ("thread2 starting at %s", ctime (&now));
+
+	// do the computation
+	for(s=0; s<FFT_SER; s++){
+		memset((void*) &Rout2, 0, (FFT_LEN>>1)*sizeof(double));
+		memset((void*) &Iout2, 0, (FFT_LEN>>1)*sizeof(double));
+		fft((FFT_LEN>>1), 0, Rin, Iin, Rout2, Iout2);
+		for(i=0; i<(FFT_LEN>>2); i++){
+			A_Mod=ImModul(Rout2[i],Iout2[i]);
+			if(A_Mod > MAX_A){
+				MAX_A = A_Mod;
+				F_p = i;
+			}
+		}
+	}
+	printf("Maximum value = %f at frequency %d.\n", MAX_A, F_p);
+	// set the barrier at this point...
+	/*________________________________________*/
+	pthread_barrier_wait(&barrier);
+	// after this point, all three threads have completed.
+	time (&now);
+	printf ("barrier in thread2() done at %s", ctime (&now));
+    pthread_exit( NULL );
+}
+
+int main (){
+	//pthread_t  thID[NumTh];
+	int i;
+	double f = 10.0;
+    time_t  now;
+    pthread_t thID[2];
+
+	 //create a barrier object with a count of 3
+	 /*________________________________________*/
+
+    pthread_barrier_init(&barrier, NULL, 3);
+
+     //signal generation and storing in Rin array
+    while(1){
+    f=f+10.0;
+     for(i=0; i<FFT_LEN; i++)
+	   Rin[i] = sin(2.0*PI*f*(double)i/(double)FFT_LEN);
+
+	 //start up two threads, thread1 and thread2
+	 /*________________________________________*/
+     pthread_create(&thID[0], NULL, thread1, NULL);
+     pthread_create(&thID[1], NULL, thread2, NULL);
+	 /*________________________________________*/
+
+	 // at this point, thread1 and thread2 are running
+	 // now wait for completion
+	 time (&now);
+	 printf ("main() waiting for barrier at %s", ctime (&now));
+
+	 //barrier - wait while threads finish their work
+	 /*________________________________________*/
+	 pthread_barrier_wait(&barrier);
+	 sleep(5);
+	 // after this point, all three threads have completed.
+	 time (&now);
+	 printf ("barrier in main() done at %s", ctime (&now));
+	 pthread_cancel(thID[0]);
+	 pthread_cancel(thID[1]);
+	 sleep(2);
+    }
+	 return (EXIT_SUCCESS);
+}
