@@ -1,0 +1,202 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
+#include <time.h>
+#include <sys/resource.h>
+
+#define NumThreads 2
+
+int state; //indicates which state we are in
+
+void *state_0(void *);
+void *state_1(void *);
+void *state_2(void *);
+void *state_3(void *);
+
+char *progname = "condvar";
+
+
+/*we have to declare mutex variable, it must be global shared variable*/
+pthread_mutex_t var_mutex = PTHREAD_MUTEX_INITIALIZER;
+/*we have to declare conditional variable, it must be global shared variable*/
+pthread_cond_t  var_cond  = PTHREAD_COND_INITIALIZER;
+
+int main(void) {
+	pthread_t threadID[NumThreads];
+    int i=0;
+
+    state = 0;
+
+	printf("%s: starting, creating theads ...\n", progname);
+
+	i=1;
+	pthread_create( &threadID[i], NULL, &state_1, (void *)i);
+	i=0;
+	pthread_create( &threadID[i], NULL, &state_0, (void *)i);
+
+	i=2;
+	pthread_create( &threadID[i], NULL, &state_2, (void *)i);
+	i=3;
+	pthread_create( &threadID[i], NULL, &state_3, (void *)i);
+
+	/*wait while threads do their jobs*/
+	sleep(60);
+
+	printf("%s: stopping, canceling threads ... \n", progname);
+
+	for(i = 0; i < NumThreads; i++){
+		pthread_cancel( threadID[i]);
+	}
+
+	printf("%s: main exiting\n", progname );
+	return EXIT_SUCCESS;
+}
+
+/* state_0 thread is producer*/
+void *state_0(void *arg){
+	struct timespec req = {0};
+	int milisec = 1000;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000000L; //1ms
+
+	while(1){
+		/*Starting the  critical section*/
+		pthread_mutex_lock(&var_mutex);
+		while(state != 0){
+			/*waiting for conditional variable's state changing and releasing mutex*/
+			pthread_cond_wait(&var_cond, &var_mutex);
+
+		}
+		/*changing state to 1 */
+		state = 1;
+		printf("%s: transit 0 - > %d!\n",
+					progname, state );
+
+		//nanosleep(&req, (struct timespec *)NULL);
+
+		/*signaling conditional variable's state changing */
+		//pthread_cond_signal(&var_cond);
+		pthread_cond_broadcast(&var_cond);
+
+		/*ending the critical section*/
+		pthread_mutex_unlock(&var_mutex);
+
+	}
+	return (NULL);
+}
+
+/* state_1 thread is consumer*/
+void *state_1(void *arg){
+	struct timespec req = {0};
+	int milisec = 1000;
+	int lpolicy,i;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000000L; //1ms
+
+	while(1){
+		/*Starting the  critical section*/
+		pthread_mutex_lock(&var_mutex);
+		while(state != 1){
+			/*waiting for conditional variable's state changing and releasing mutex*/
+			pthread_cond_wait(&var_cond, &var_mutex);
+
+		}
+		/*changing state to 0 */
+		state = 0;
+
+		/*Use below code to transit stage 2 and 3*/
+		//if(++i & 0x1)
+		//state = 3; /*changing state to 3 */
+		//else
+		//state = 2; /*changing state to 2 */
+
+		state = (++i & 0x1)? 3:2;
+
+		printf("%s: transit 1 - > %d!\n", progname, state );
+
+		//nanosleep(&req, (struct timespec *)NULL);
+
+		/*signaling conditional variable's state changing */
+		//pthread_cond_signal(&var_cond);
+		pthread_cond_broadcast(&var_cond);
+
+		/*ending the critical section*/
+		pthread_mutex_unlock(&var_mutex);
+
+	}
+	return (NULL);
+}
+
+/* state_2 thread is consumer*/
+void *state_2(void *arg){
+	struct timespec req = {0};
+	int milisec = 1000;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000000L; //1ms
+
+	while(1){
+		/*Starting the  critical section*/
+		pthread_mutex_lock(&var_mutex);
+		while(state != 2){
+			/*waiting for conditional variable's state changing and releasing mutex*/
+			pthread_cond_wait(&var_cond, &var_mutex);
+
+		}
+
+		/*changing state to 0 */
+		state = 0;
+		printf("%s: transit 2 - > %d!\n", progname, state );
+
+		//nanosleep(&req, (struct timespec *)NULL);
+
+		/*signaling conditional variable's state changing */
+		//pthread_cond_signal(&var_cond);
+		pthread_cond_broadcast(&var_cond);
+		/*ending the critical section*/
+		pthread_mutex_unlock(&var_mutex);
+
+	}
+	return (NULL);
+}
+
+/* state_3 thread is consumer*/
+void *state_3(void *arg){
+	struct timespec req = {0};
+	int milisec = 1000;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000000L; //1ms
+
+	while(1){
+		/*Starting the  critical section*/
+		pthread_mutex_lock(&var_mutex);
+		while(state != 3){
+			/*waiting for conditional variable's state changing and releasing mutex*/
+			pthread_cond_wait(&var_cond, &var_mutex);
+
+		}
+		/*changing state to 0 */
+		state = 0;
+		printf("%s: transit 3 - > %d!\n",
+					progname, state );
+
+		//nanosleep(&req, (struct timespec *)NULL);
+
+		/*signaling conditional variable's state changing */
+		//pthread_cond_signal(&var_cond);
+		pthread_cond_broadcast(&var_cond);
+
+		/*ending the critical section*/
+		pthread_mutex_unlock(&var_mutex);
+
+	}
+	return (NULL);
+}
