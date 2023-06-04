@@ -1,0 +1,99 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
+#include <time.h>
+#include <sys/resource.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <malloc.h>
+
+#define NumConsThreads 5
+
+#define SEM_NAME "/Semex"
+
+void *producer(void *i);
+void *consumer(void *i);
+
+char *progname = "semex";
+
+sem_t *mySemaphore;
+
+int main(void) {
+	pthread_t ConsthreadID[NumConsThreads];
+	pthread_t ProdthreadID;
+	int i;
+
+#define Named   /*zmiana zakomentowany lub nie jako semafor nazwany i nie*/
+#ifdef Named
+	printf("%s: named semaphore ...\n", progname);
+
+	mySemaphore = sem_open(SEM_NAME, O_CREAT|O_EXCL, S_IRWXU, 0);
+	sem_unlink(SEM_NAME);
+#else
+	printf("%s: unnamed semaphore ...\n", progname);
+
+	mySemaphore = malloc(sizeof(sem_t));
+	sem_init(mySemaphore, 1, 0);
+#endif
+
+	printf("%s: starting, creating theads ...\n", progname);
+
+	for(i = 0; i < NumConsThreads; i++){
+		pthread_create( &ConsthreadID[i], NULL, consumer, (void *)i);
+	}
+
+	pthread_create( &ProdthreadID, NULL, producer, (void *)i);
+
+
+	sleep(5);
+
+	printf("%s: stopping, canceling threads ... \n", progname);
+
+	for(i = 0; i < NumConsThreads; i++){
+		pthread_cancel( ConsthreadID[i]);
+	}
+
+	pthread_cancel( ProdthreadID);
+
+	printf("%s: main exiting \n", progname );
+	return EXIT_SUCCESS;
+}
+
+/*producer thread*/
+void *producer(void *i){
+	struct timespec req = {0};
+	int milisec = 1000000;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000000L; //milisec*1ms
+
+	while(1){
+		//nanosleep(&req, (struct timespec *)NULL);
+		//sleep(1);
+		printf("%s: producer %d, posted semaphore \n", progname, (int)i );
+		sem_post(mySemaphore);
+	}
+	return (NULL);
+}
+
+/*consumer thread*/
+void *consumer(void *i){
+	struct timespec req = {0};
+	int milisec = 1000000;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000000L; //milisec*1ms
+
+	while(1){
+		//nanosleep(&req, (struct timespec *)NULL);
+		//sleep(1);
+		sem_wait(mySemaphore);
+		printf("%s: consumer %d, get semaphore \n", progname, (int)i );
+	}
+	return (NULL);
+}
