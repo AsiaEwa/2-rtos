@@ -1,0 +1,135 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <sched.h>
+#include <time.h>
+#include <sys/resource.h>
+
+#define NumThreads 4
+
+volatile int var1;
+volatile int var2;
+
+void *update_thread(void *i);
+
+char *progname = "mutex";
+/*we have to declare mutex variable, it must be global shared variable*/
+/*_________________________________*/
+pthread_mutex_t var_mutex;
+
+int main(void) {
+	pthread_t threadID[NumThreads];
+	pthread_attr_t attrib;
+	struct sched_param param;
+	int policy;
+	int oldcancel;
+	int i,error;
+
+
+	var1 = var2 = 0;
+
+	printf("%s: starting, creating theads ...\n", progname);
+
+	/*we have to initialize the mutex defined above*/
+	/*______________________________*/
+	pthread_mutex_init(&var_mutex, NULL);
+
+    printf("%s: min priority for SCHED_RR is %d\n", progname, (int)sched_get_priority_min(SCHED_RR));
+    printf("%s: max priority for SCHED_RR is %d\n", progname, (int)sched_get_priority_max(SCHED_RR));
+
+    error=pthread_getschedparam( pthread_self(), &policy, &param );
+    if(error!=0){
+        printf("%s: failed to get priority\n", progname);
+    }
+
+    error=pthread_attr_init(&attrib);
+    if(error!=0){
+        printf("%s: failed to init attribute \n", progname);
+    }
+
+    pthread_attr_setinheritsched(&attrib, PTHREAD_EXPLICIT_SCHED);
+
+    error=pthread_attr_setschedpolicy(&attrib, SCHED_RR);
+    if(error!=0){
+        printf("failed to set sched policy\n");
+    }
+
+
+    param.sched_priority = 10;
+
+	error=pthread_attr_setschedparam( &attrib, &param );
+    if(error!=0){
+        printf("failed to set priority\n");
+    }
+
+	//pthread_setcanceltype( PTHREAD_CANCEL_ASYNCHRONOUS, &oldcancel );
+
+
+	for(i = 0; i < NumThreads; i++){
+		pthread_create( &threadID[i], &attrib, &update_thread, (void *)i);
+	}
+
+	/*wait while threads do their jobs*/
+	sleep(90);
+
+	printf("%s: stopping, canceling threads ... \n", progname);
+
+	for(i = 0; i < NumThreads; i++){
+		pthread_cancel( threadID[i]);
+	}
+
+	printf("%s: all done, var1 = %d, var2 = %d\n", progname, var1, var2);
+	return EXIT_SUCCESS;
+}
+
+void do_work(){
+	static int var3;
+
+	var3++;
+	if(!(var3 % 10000000))
+		printf("%s: thread %d did some work\n",progname, (int)pthread_self() );
+}
+
+void *update_thread(void *i){
+	struct timespec req = {0};
+	int milisec = 1;
+	int lpolicy;
+	struct sched_param lparam;
+	req.tv_sec = 0;
+	req.tv_nsec = milisec * 1000L; //1us
+
+	pthread_getschedparam( pthread_self(), &lpolicy, &lparam );
+	printf("%s: thread %d with priority: %d \n",
+			progname, (int) i, (int)lparam.sched_priority );
+
+	while(1){
+		pthread_mutex_lock(&var_mutex);
+		if(var1 != var2){
+			int lvar1, lvar2;
+			lvar1 = var1;
+			lvar2 = var2;
+			var1 = var2;
+			/*ending of the critical section*/
+			pthread_mutex_unlock(&var_mutex);
+
+			printf("%s: thread %d with priority: %d, var1 (%d) is not equal to var2 (%d)!\n",
+					progname, (int) i, (int)lparam.sched_priority, var1, var2);
+
+			var1 = var2;
+		}
+		else
+			/*ending of the critical section*/
+			pthread_mutex_unlock(&var_mutex);
+		do_work();
+		/*beginning of the critical section*/
+		pthread_mutex_lock(&var_mutex);
+		/*value of var1 and var2 should be changed in critical section*/
+		var1++;
+		var2++;
+		/*end of critical section*/
+		pthread_mutex_unlock(&var_mutex);
+		//nanosleep(&req, (struct timespec *)NULL);
+	 }
+	return (NULL);
+}
