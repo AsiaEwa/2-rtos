@@ -113,7 +113,7 @@ Run 4th time:
 
 After unlocking sem_unlink:
 
-![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/5ca4facd-d42f-453e-96b0-948ffbf6cee8
+![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/5ca4facd-d42f-453e-96b0-948ffbf6cee8)
 ![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/070d9656-fed2-4ce3-a77a-5bb1f246bd9f)
 ![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/f06127ab-f816-435e-8571-211042d7774d)
 ![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/e0cdd8b1-f721-40c1-b225-8844b52facfb)
@@ -177,6 +177,6 @@ With while
 ![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/a49fbacf-33d0-473d-8c19-c070974d952e)
 
 #### Result:
-![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/034c7581-f233-4932-8d7b-2d301c56078b
+![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/034c7581-f233-4932-8d7b-2d301c56078b)
 ![image](https://github.com/AsiaEwa/2-rtos/assets/101841759/f7176559-ce81-4075-b582-fc21cbbc077a)
 
